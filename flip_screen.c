@@ -61,11 +61,14 @@ void set_blocking(int fd, int should_block) {
 
 int main(int argc, char const *argv[]) {
 
-	char *portname = "/dev/ttyUSB0";
+	if (argc < 2) {
+		printf("Please start with %s /dev/ttyS1 (for example)\n", argv[0]);
+		return;
+	}
 
-	int fd = open (portname, O_RDWR | O_NOCTTY | O_SYNC);
+	int fd = open(argv[1], O_RDWR | O_NOCTTY | O_SYNC);
 	if (fd < 0) {
-		printf("error %d opening %s: %s", errno, portname, strerror (errno));
+		printf("error %d opening %s: %s\n", errno, argv[1], strerror(errno));
 		return;
 	}
 
