@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <termios.h>
 
+
 int set_interface_attribs(int fd, int speed, int parity) {
 
 	struct termios tty;
@@ -72,11 +73,13 @@ int main(int argc, char const *argv[]) {
 		return;
 	}
 
-	set_interface_attribs (fd, B115200, 0);  // set speed to 115,200 bps, 8n1 (no parity)
-	set_blocking (fd, 0);                // set no blocking
+	set_interface_attribs(fd, B115200, 0);  // set speed to 115,200 bps, 8n1 (no parity)
+	set_blocking(fd, 0);                // set no blocking
 	
-	int rotation = 0;
-	char buf [100];
+	int rotation;
+	char buf[100];
+
+	int is_first_time = 1;
 
 	while (1) {
 
@@ -84,17 +87,29 @@ int main(int argc, char const *argv[]) {
 		
 		int n = read(fd, buf, sizeof buf);  // read up to 100 characters if ready to read
 		printf("%s %d\n", buf, strlen(buf));
-		if (strlen(buf))
+
+		if (is_first_time) {
+			if (strlen(buf))
+				rotation = 1;
+			else
+				rotation = 0;
+			is_first_time = 0;
+			continue;
+		}
+
+		if (strlen(buf)) {
 			if (rotation == 0) {
-					system("xrandr -o left\n");
-					rotation = 1;
-				}
-		else
+				system("xrandr -o left\n");
+				rotation = 1;
+			}
+		}
+		else {
 			if (rotation == 1) {
 				system("xrandr -o normal\n");
 				rotation = 0;
 			}
-
+		}
+		printf("rotation: %d\n", rotation);
 		strcpy(buf, "");
 		sleep(1);
 	}
