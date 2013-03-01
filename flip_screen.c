@@ -1,59 +1,100 @@
 #include <string.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <termios.h>
- 
-int main(int argc,char** argv)
-{
-		struct termios tio;
-		struct termios stdio;
-		struct termios old_stdio;
-		int tty_fd;
- 
-		unsigned char c='D';
-		tcgetattr(STDOUT_FILENO,&old_stdio);
- 
-		printf("Please start with %s /dev/ttyS1 (for example)\n",argv[0]);
-		memset(&stdio,0,sizeof(stdio));
-		stdio.c_iflag=0;
-		stdio.c_oflag=0;
-		stdio.c_cflag=0;
-		stdio.c_lflag=0;
-		stdio.c_cc[VMIN]=1;
-		stdio.c_cc[VTIME]=0;
-		tcsetattr(STDOUT_FILENO,TCSANOW,&stdio);
-		tcsetattr(STDOUT_FILENO,TCSAFLUSH,&stdio);
-		fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);       // make the reads non-blocking
- 
-		memset(&tio,0,sizeof(tio));
-		tio.c_iflag=0;
-		tio.c_oflag=0;
-		tio.c_cflag=CS8|CREAD|CLOCAL;           // 8n1, see termios.h for more information
-		tio.c_lflag=0;
-		tio.c_cc[VMIN]=1;
-		tio.c_cc[VTIME]=5;
- 
-		tty_fd=open(argv[1], O_RDWR | O_NONBLOCK);      
-		cfsetospeed(&tio,B115200);            // 115200 baud
-		cfsetispeed(&tio,B115200);            // 115200 baud
- 
-		tcsetattr(tty_fd,TCSANOW,&tio);
+
+int set_interface_attribs(int fd, int speed, int parity) {
+
+	struct termios tty;
+	memset(&tty, 0, sizeof tty);
+	if (tcgetattr(fd, &tty) != 0) {
+		printf("error %d from tcgetattr", errno);
+		return -1;
+	}
+
+	cfsetospeed(&tty, speed);
+	cfsetispeed(&tty, speed);
+
+	tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
+	// disable IGNBRK for mismatched speed tests; otherwise receive break
+	// as \000 chars
+	tty.c_iflag &= ~IGNBRK;         // ignore break signal
+	tty.c_lflag = 0;                // no signaling chars, no echo,
+									// no canonical processing
+	tty.c_oflag = 0;                // no remapping, no delays
+	tty.c_cc[VMIN]  = 0;            // read doesn't block
+	tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
+
+	tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
+
+	tty.c_cflag |= (CLOCAL | CREAD);// ignore modem controls,
+									// enable reading
+	tty.c_cflag &= ~(PARENB | PARODD);      // shut off parity
+	tty.c_cflag |= parity;
+	tty.c_cflag &= ~CSTOPB;
+	tty.c_cflag &= ~CRTSCTS;
+
+	if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+		printf("error %d from tcsetattr", errno);
+		return -1;
+	}
+
+	return 0;
+}
+
+void set_blocking(int fd, int should_block) {
+
+	struct termios tty;
+	memset (&tty, 0, sizeof tty);
+	if (tcgetattr(fd, &tty) != 0) {
+		printf("error %d from tggetattr", errno);
+		return;
+	}
+
+	tty.c_cc[VMIN]  = should_block ? 1 : 0;
+	tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
+
+	if (tcsetattr (fd, TCSANOW, &tty) != 0)
+		printf("error %d setting term attributes", errno);
+}
+
+int main(int argc, char const *argv[]) {
+
+	char *portname = "/dev/ttyUSB0";
+
+	int fd = open (portname, O_RDWR | O_NOCTTY | O_SYNC);
+	if (fd < 0) {
+		printf("error %d opening %s: %s", errno, portname, strerror (errno));
+		return;
+	}
+
+	set_interface_attribs (fd, B115200, 0);  // set speed to 115,200 bps, 8n1 (no parity)
+	set_blocking (fd, 0);                // set no blocking
+	
+	int rotation = 0;
+	char buf [100];
+
+	while (1) {
+
+		write(fd, "hello!\n", 7);           // send 7 character greeting
 		
-		while (c!='q') {
-				if (read(tty_fd,&c,1)>0)
-					// write(STDOUT_FILENO,&c,1);
-					printf("fuuuu ");              // if new data is available on the serial port, print it out
-				// if (read(STDIN_FILENO,&c,1)>0)
-					// write(tty_fd,&c,1);                     // if new data is available on the console, send it to the serial port
-				unsigned char a='a';
-				write(tty_fd,&a,1);
-				read(STDIN_FILENO,&c,1)>0;
-		}
- 
-		close(tty_fd);
-		tcsetattr(STDOUT_FILENO,TCSANOW,&old_stdio);
- 
-		return EXIT_SUCCESS;
+		int n = read(fd, buf, sizeof buf);  // read up to 100 characters if ready to read
+		printf("%s %d\n", buf, strlen(buf));
+		if (strlen(buf))
+			if (rotation == 0) {
+					system("xrandr -o left\n");
+					rotation = 1;
+				}
+		else
+			if (rotation == 1) {
+				system("xrandr -o normal\n");
+				rotation = 0;
+			}
+
+		strcpy(buf, "");
+		sleep(1);
+	}
+
+	return 0;
 }
