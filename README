@@ -1,2 +1,11 @@
-Dependencies:
-	sudo apt-get install libxrandr-dev
+Utility for automatically flip the screen when the monitor is rotated to the vertical position and back to the horizontal position. 
+
+It uses serial port. 
+When Rxd and Txd are connected screen flips to the veritcal position, when aren't connected flips to the horizontal.
+
+OS:
+	Linux
+
+Run:
+	1. make
+	2. sudo ./flip_screen /dev/ttyS0 (for example)
