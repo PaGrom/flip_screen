@@ -9,3 +9,6 @@ OS:
 Run:
 	1. make
 	2. sudo ./flip_screen /dev/ttyS0 (for example)
+
+Read:
+	http://habrahabr.ru/post/137650/
