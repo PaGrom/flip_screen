@@ -110,7 +110,7 @@ int main(int argc, char const *argv[]) {
 			}
 		}
 		printf("rotation: %d\n", rotation);
-		strcpy(buf, "");
+		memset(buf, 0, sizeof(buf));
 		sleep(1);
 	}
 
